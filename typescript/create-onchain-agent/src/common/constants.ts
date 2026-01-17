@@ -283,3 +283,20 @@ export const PrepareAgentkitRouteConfigurations: Record<
     },
   },
 };
+export const ModelProviders = [
+  "OpenAI",
+  "Gemini",
+  "Anthropic",
+] as const ;
+
+export type ModelProvider = typeof ModelProviders[number];
+export const ModelProviderDescriptions: Record<ModelProvider,string> = {
+  OpenAI: "gpt-4",
+  Gemini: "gemini-2.5-flash-lite",
+    Anthropic: "claude-3-5-sonnet-20241022",
+}
+export const DefaultModels: Record<ModelProvider, string> = {
+  OpenAI: "gpt-4",
+  Gemini: "gemini-pro",
+  Anthropic: "claude-3-5-sonnet-20241022",
+};

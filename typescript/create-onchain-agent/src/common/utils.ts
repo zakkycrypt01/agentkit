@@ -9,6 +9,7 @@ import {
   AgentkitRouteConfigurations,
   NextTemplateRouteConfigurations,
   MCPRouteConfigurations,
+  DefaultModels,
 } from "./constants.js";
 
 /**
@@ -199,6 +200,45 @@ export const getWalletProviders = (network?: Network): readonly WalletProviderCh
 };
 
 /**
+ * Generates environment variable configuration for the selected model provider.
+ *
+ * @param {string} modelProvider - The selected AI model provider.
+ * @returns {string[]} Array of environment variable lines for the model provider.
+ */
+function getModelProviderEnvConfig(modelProvider: string = "OpenAI"): string[] {
+  const lines: string[] = [];
+  
+  switch (modelProvider) {
+    case "OpenAI":
+      lines.push("# OpenAI Configuration");
+      lines.push("# Get keys from OpenAI Platform: https://platform.openai.com/api-keys");
+      lines.push("OPENAI_API_KEY=");
+      lines.push(`OPENAI_MODEL=${DefaultModels.OpenAI}`);
+      break;
+    case "Gemini":
+      lines.push("# Google Gemini Configuration");
+      lines.push("# Get keys from Google AI Studio: https://aistudio.google.com/app/apikey");
+      lines.push("GEMINI_API_KEY=");
+      lines.push(`GEMINI_MODEL=${DefaultModels.Gemini}`);
+      break;
+    case "Anthropic":
+      lines.push("# Anthropic Configuration");
+      lines.push("# Get keys from Anthropic Console: https://console.anthropic.com/");
+      lines.push("ANTHROPIC_API_KEY=");
+      lines.push(`ANTHROPIC_MODEL=${DefaultModels.Anthropic}`);
+      break;
+    default:
+      // Default to OpenAI
+      lines.push("# OpenAI Configuration");
+      lines.push("# Get keys from OpenAI Platform: https://platform.openai.com/api-keys");
+      lines.push("OPENAI_API_KEY=");
+      lines.push(`OPENAI_MODEL=${DefaultModels.OpenAI}`);
+  }
+  
+  return lines;
+}
+
+/**
  * Handles the selection of a network and wallet provider, updating the project configuration accordingly.
  *
  * This function:
@@ -214,6 +254,7 @@ export const getWalletProviders = (network?: Network): readonly WalletProviderCh
  * @param {Network} [network] - The optional blockchain network.
  * @param {string} [chainId] - The optional chain ID for the network.
  * @param {string} [rpcUrl] - The optional RPC URL for the network.
+ * @param {string} [modelProvider] - The optional AI model provider (OpenAI, Gemini, or Anthropic).
  * @throws {Error} If neither `network` nor `chainId` are provided, or if the selected combination is invalid.
  * @returns {Promise<void>} A promise that resolves when the selection process is complete.
  */
@@ -224,6 +265,7 @@ export async function handleNextSelection(
   network?: Network,
   chainId?: string,
   rpcUrl?: string,
+  modelProvider?: string,
 ): Promise<void> {
   const agentDir = path.join(root, "app", "api", "agent");
 
@@ -245,33 +287,30 @@ export async function handleNextSelection(
 
   // Create .env file
   const envPath = path.join(root, ".env.local");
+  const modelProviderConfig = getModelProviderEnvConfig(modelProvider);
+  
   const envLines = [
-    // Start file with notes regarding .env var setup
-    ...[
-      "Get keys from OpenAI Platform: https://platform.openai.com/api-keys",
-      ...agentkitRouteConfig.env.topComments,
-    ]
-      .map(comment => `# ${comment}`)
-      .join("\n"),
+    // Start file with model provider configuration
+    ...modelProviderConfig,
+    // Add agentkit comments
+    "",
+    ...agentkitRouteConfig.env.topComments.map(comment => `# ${comment}`),
     // Continue with # Required section
-    "\n\n# Required\n",
-    ...["OPENAI_API_KEY=", ...agentkitRouteConfig.env.required.map(line => `${line}=`)].join("\n"),
+    "\n# Required",
+    ...agentkitRouteConfig.env.required.map(line => `${line}=`),
     // Finish with # Optional section
-    "\n\n# Optional\n",
-    ...[
-      `NETWORK_ID=${network ?? ""}`,
-      rpcUrl ? `RPC_URL=${rpcUrl}` : null,
-      chainId ? `CHAIN_ID=${chainId}` : null,
-      ...agentkitRouteConfig.env.optional.map(line => `${line}=`),
-    ]
-      .filter(Boolean)
-      .join("\n"),
-  ];
+    "\n# Optional",
+    `NETWORK_ID=${network ?? ""}`,
+    ...(rpcUrl ? [`RPC_URL=${rpcUrl}`] : []),
+    ...(chainId ? [`CHAIN_ID=${chainId}`] : []),
+    ...agentkitRouteConfig.env.optional.map(line => `${line}=`),
+  ].join("\n");
+  
   await fs.writeFile(envPath, envLines);
 
-  // Promose selected routes to
-  const promoteRoute = async (toPromose: string, type: string, to: string) => {
-    const selectedRoutePath = path.join(agentDir, type, toPromose);
+  // Promote selected routes
+  const promoteRoute = async (toPromote: string, type: string, to: string) => {
+    const selectedRoutePath = path.join(agentDir, type, toPromote);
     const newRoutePath = path.join(agentDir, to);
     await fs.rename(selectedRoutePath, newRoutePath);
   };
@@ -286,20 +325,21 @@ export async function handleNextSelection(
 }
 
 /**
- * Handles the selection of a network and wallet provider, updating the project configuration accordingly.
+ * Handles the selection of a network and wallet provider for MCP configuration.
  *
  * This function:
  * - Determines the network family (`EVM` or `SVM`) based on the provided network or chain ID.
  * - Retrieves the correct route configuration for the selected wallet provider.
- * - Creates or updates the `.env.local` file with required and optional environment variables.
- * - Moves the selected API route file to `api/agent/route.ts`.
- * - Deletes all unselected API routes and cleans up empty directories.
+ * - Creates or updates the claude_desktop_config.json file with environment variables.
+ * - Moves the selected MCP route file.
+ * - Deletes all unselected routes and cleans up empty directories.
  *
  * @param {string} root - The root directory of the project.
  * @param {WalletProviderChoice} walletProvider - The selected wallet provider.
  * @param {Network} [network] - The optional blockchain network.
  * @param {string} [chainId] - The optional chain ID for the network.
  * @param {string} [rpcUrl] - The optional RPC URL for the network.
+ * @param {string} [modelProvider] - The optional AI model provider (OpenAI, Gemini, or Anthropic).
  *
  * @returns {Promise<void>} A promise that resolves when the function completes.
  */
@@ -308,7 +348,7 @@ export async function handleMcpSelection(
   walletProvider: WalletProviderChoice,
   network?: Network,
   chainId?: string,
-  rpcUrl?: string,
+  modelProvider?: string,
 ): Promise<void> {
   const srcDir = path.join(root, "src");
 
@@ -325,6 +365,7 @@ export async function handleMcpSelection(
   /**
    * Copies the claude_desktop_config.json file to the root directory
    * and replaces the {parentFolderPath} placeholder with the absolute path.
+   * Also adds model provider configuration if specified.
    */
   async function copyAndReplaceConfig() {
     const existingConfig = await fs.readFile(
@@ -337,6 +378,14 @@ export async function handleMcpSelection(
       "{absolutePath}",
       root,
     );
+
+    // Add model provider to environment variables
+    if (modelProvider) {
+      const modelKey = `${modelProvider.toUpperCase()}_API_KEY`;
+      const modelNameKey = `${modelProvider.toUpperCase()}_MODEL`;
+      configJson.mcpServers.agentkit.env[modelKey] = "";
+      configJson.mcpServers.agentkit.env[modelNameKey] = DefaultModels[modelProvider as keyof typeof DefaultModels] || "";
+    }
 
     if (network) {
       // privy uses CHAIN_ID, others use NETWORK_ID
@@ -351,10 +400,6 @@ export async function handleMcpSelection(
 
     if (chainId) {
       configJson.mcpServers.agentkit.env.CHAIN_ID = chainId;
-    }
-
-    if (rpcUrl) {
-      configJson.mcpServers.agentkit.env.RPC_URL = rpcUrl;
     }
 
     await fs.writeFile(

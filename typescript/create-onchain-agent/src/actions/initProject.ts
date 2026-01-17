@@ -9,6 +9,8 @@ import {
   FrameworkToTemplates,
   NetworkToWalletProviders,
   SVM_NETWORKS,
+  ModelProviders,
+  ModelProviderDescriptions,
 } from "../common/constants.js";
 import { copyTemplate } from "../common/fileSystem.js";
 import { Framework, Network, WalletProviderChoice } from "../common/types.js";
@@ -23,10 +25,10 @@ import {
 /**
  * Initializes the project creation process.
  *
- * - Prompts the user for project details including project name, package name, network, chain ID, and wallet provider.
+ * - Prompts the user for project details including project name, package name, network, chain ID, wallet provider, and AI model provider.
  * - Validates user input, ensuring directories do not already exist and package names are valid.
  * - Copies the selected template to the new project directory.
- * - Handles network and wallet provider selection logic.
+ * - Handles network, wallet provider, and model provider selection logic.
  * - Displays a summary of the created project along with next steps.
  */
 export async function initProject() {
@@ -55,6 +57,7 @@ export async function initProject() {
     | "walletProvider"
     | "framework"
     | "template"
+    | "modelProvider"
   >;
 
   try {
@@ -220,6 +223,16 @@ export async function initProject() {
             }));
           },
         },
+        {
+          type: "select",
+          name: "modelProvider",
+          message: pc.reset("Choose an AI model provider:"),
+          choices: ModelProviders.map((provider, index) => ({
+            title: `${provider}${index === 0 ? " (default)" : ""} - ${ModelProviderDescriptions[provider]}`,
+            value: provider,
+          })),
+          initial: 0,
+        },
       ],
       {
         onCancel: () => {
@@ -239,6 +252,7 @@ export async function initProject() {
   const { projectName, network, chainId, rpcUrl, framework } = result;
   const packageName = result.packageName || toValidPackageName(projectName);
   const walletProvider = result.walletProvider || "Viem";
+  const modelProvider = result.modelProvider || "OpenAI";
   // If template wasn't selected (because there was only one option), use the first template
   const template = result.template || FrameworkToTemplates[framework as Framework][0];
 
@@ -250,7 +264,7 @@ export async function initProject() {
   // Handle selection-specific logic over copied-template
   switch (template) {
     case "next":
-      await handleNextSelection(root, framework, walletProvider, network, chainId, rpcUrl);
+      await handleNextSelection(root, framework, walletProvider, network, chainId, rpcUrl, modelProvider);
 
       spinner.succeed();
       console.log(pc.blueBright(`\nSuccessfully created your AgentKit project in ${root}`));
@@ -263,6 +277,8 @@ export async function initProject() {
       console.log(pc.gray("- Tailwind CSS"));
       console.log(pc.gray("- ESLint"));
 
+      console.log(`\nAI Model Provider: ${pc.cyan(modelProvider)}`);
+
       console.log(pc.bold("\nWhat's Next?"));
 
       console.log(`\nTo get started, run the following commands:\n`);
@@ -270,15 +286,17 @@ export async function initProject() {
         console.log(` - cd ${path.relative(process.cwd(), root)}`);
       }
       console.log(" - npm install");
-      console.log(pc.gray(" - # Open .env.local and configure your API keys"));
+      console.log(pc.gray(` - # Open .env.local and configure your ${modelProvider} API key`));
       console.log(" - mv .env.local .env");
       console.log(" - npm run dev");
       break;
     case "mcp":
-      await handleMcpSelection(root, walletProvider, network, chainId);
+      await handleMcpSelection(root, walletProvider, network, chainId, modelProvider);
 
       spinner.succeed();
       console.log(pc.blueBright(`\nSuccessfully created your AgentKit project in ${root}`));
+
+      console.log(`\nAI Model Provider: ${pc.cyan(modelProvider)}`);
 
       console.log(`\nTo get started, run the following commands:\n`);
       if (root !== process.cwd()) {
@@ -301,6 +319,8 @@ export async function initProject() {
           " - # Make sure to open claude_desktop_config.json and configure your Privy API keys!",
         );
       }
+
+      console.log(pc.gray(` - # Configure your ${modelProvider} API key in the config file`));
 
       console.log(
         "\nNow open Claude Desktop and start prompting Claude to do things onchain",
