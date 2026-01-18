@@ -108,7 +108,7 @@ export const AI_API_KEY = process.env.AI_API_KEY || "";
 // Default models for each provider (can be overridden)
 export const DEFAULT_MODELS = {
   OpenAI: "gpt-4o-mini",
-  Gemini: "gemini-pro",
+  Gemini: "gemini-2.5-flash-lite",
   Anthropic: "claude-3-5-sonnet-20241022",
 };
 
