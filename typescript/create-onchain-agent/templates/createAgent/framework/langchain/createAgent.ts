@@ -1,8 +1,10 @@
 import { getLangChainTools } from "@coinbase/agentkit-langchain";
 import { MemorySaver } from "@langchain/langgraph";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { ChatOpenAI } from "@langchain/openai";
+import { BaseChatModel } from "@langchain/core/language_models/chat_model";
 import { prepareAgentkitAndWalletProvider } from "./prepareAgentkit";
+import { createLangChainModel } from "../../ai/providers/langchain-adapter.js";
+import { AI_PROVIDER, AI_API_KEY, getDefaultModel } from "../../ai/config.js";
 
 /**
  * Agent Configuration Guide
@@ -12,7 +14,8 @@ import { prepareAgentkitAndWalletProvider } from "./prepareAgentkit";
  * Key Steps to Customize Your Agent:
  *
  * 1. Select your LLM:
- *    - Modify the `ChatOpenAI` instantiation to choose your preferred LLM
+ *    - The LLM is now configured based on your selection in ai/config.ts
+ *    - Modify AI_PROVIDER and model settings in ai/config.ts
  *    - Configure model parameters like temperature and max tokens
  *
  * 2. Instantiate your Agent:
@@ -43,8 +46,12 @@ export async function createAgent(): Promise<ReturnType<typeof createReactAgent>
   try {
     const { agentkit, walletProvider } = await prepareAgentkitAndWalletProvider();
 
-    // Initialize LLM: https://platform.openai.com/docs/models#gpt-4o
-    const llm = new ChatOpenAI({ model: "gpt-4o-mini" });
+    // Initialize LLM using the configured provider
+    const llm = createLangChainModel(
+      AI_PROVIDER,
+      AI_API_KEY,
+      getDefaultModel(),
+    ) as BaseChatModel;
 
     const tools = await getLangChainTools(agentkit);
     const memory = new MemorySaver();
