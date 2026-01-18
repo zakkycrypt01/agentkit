@@ -239,6 +239,50 @@ function getModelProviderEnvConfig(modelProvider: string = "OpenAI"): string[] {
 }
 
 /**
+ * Updates the package.json file to include the required dependencies for the selected AI model provider
+ *
+ * @param {string} filePath - The path to the package.json file
+ * @param {string} [modelProvider] - The selected AI model provider (OpenAI, Gemini, or Anthropic)
+ * @returns {Promise<void>}
+ */
+async function updatePackageJsonWithModelProvider(
+  filePath: string,
+  modelProvider: string = "OpenAI",
+): Promise<void> {
+  const packageJsonContent = await fs.readFile(filePath, "utf-8");
+  const packageJson = JSON.parse(packageJsonContent);
+
+  // Map model providers to their required dependencies (both LangChain and Vercel AI SDK)
+  const providerDependencies = {
+    OpenAI: {
+      "@langchain/openai": "^1.2.2",
+      "@ai-sdk/openai": "^3.0.12",
+    },
+    Gemini: {
+      "@langchain/google-genai": "^2.1.10",
+      "@ai-sdk/google": "^3.0.10",
+    },
+    Anthropic: {
+      "@langchain/anthropic": "^1.3.10",
+      "@ai-sdk/anthropic": "^3.0.15",
+    },
+  };
+
+  const dependencies = providerDependencies[modelProvider as keyof typeof providerDependencies] || providerDependencies.OpenAI;
+
+  // Add the required dependencies
+  if (!packageJson.dependencies) {
+    packageJson.dependencies = {};
+  }
+
+  for (const [dep, version] of Object.entries(dependencies)) {
+    packageJson.dependencies[dep] = version;
+  }
+
+  await fs.writeFile(filePath, JSON.stringify(packageJson, null, 2));
+}
+
+/**
  * Updates the create-agent.ts file to use the selected AI model provider
  * instead of being hardcoded to OpenAI.
  *
@@ -252,47 +296,95 @@ async function updateCreateAgentWithModelProvider(
 ): Promise<void> {
   let content = await fs.readFile(filePath, "utf-8");
 
-  // Map model providers to their corresponding classes and env vars
-  const modelConfig = {
-    OpenAI: {
-      import: 'import { ChatOpenAI } from "@langchain/openai";',
-      constructor: 'const llm = new ChatOpenAI({ model: "gpt-4o-mini" });',
-      envKey: "OPENAI_API_KEY",
-      envVar: "process.env.OPENAI_API_KEY",
-    },
-    Gemini: {
-      import: 'import { ChatGoogleGenerativeAI } from "@langchain/google-genai";',
-      constructor: 'const llm = new ChatGoogleGenerativeAI({ model: "gemini-pro" });',
-      envKey: "GEMINI_API_KEY",
-      envVar: "process.env.GEMINI_API_KEY",
-    },
-    Anthropic: {
-      import: 'import { ChatAnthropic } from "@langchain/anthropic";',
-      constructor: 'const llm = new ChatAnthropic({ model: "claude-3-5-sonnet-20241022" });',
-      envKey: "ANTHROPIC_API_KEY",
-      envVar: "process.env.ANTHROPIC_API_KEY",
-    },
-  };
+  // Determine if this is LangChain or Vercel AI SDK based on imports
+  const isLangChain = content.includes("@langchain/langgraph");
+  const isVercelAI = content.includes("@ai-sdk/openai");
 
-  const config = modelConfig[modelProvider as keyof typeof modelConfig] || modelConfig.OpenAI;
+  if (isLangChain) {
+    // LangChain model configuration
+    const langchainConfig = {
+      OpenAI: {
+        import: 'import { ChatOpenAI } from "@langchain/openai";',
+        constructor: 'const llm = new ChatOpenAI({ model: "gpt-4o-mini" });',
+        envKey: "OPENAI_API_KEY",
+        envVar: "process.env.OPENAI_API_KEY",
+      },
+      Gemini: {
+        import: 'import { ChatGoogleGenerativeAI } from "@langchain/google-genai";',
+        constructor: 'const llm = new ChatGoogleGenerativeAI({ model: "gemini-pro" });',
+        envKey: "GEMINI_API_KEY",
+        envVar: "process.env.GEMINI_API_KEY",
+      },
+      Anthropic: {
+        import: 'import { ChatAnthropic } from "@langchain/anthropic";',
+        constructor: 'const llm = new ChatAnthropic({ model: "claude-3-5-sonnet-20241022" });',
+        envKey: "ANTHROPIC_API_KEY",
+        envVar: "process.env.ANTHROPIC_API_KEY",
+      },
+    };
 
-  // Replace the import statement
-  content = content.replace(
-    /import\s+{\s*Chat\w+\s*}\s+from\s+["']@langchain\/\w+["'];/,
-    config.import,
-  );
+    const config = langchainConfig[modelProvider as keyof typeof langchainConfig] || langchainConfig.OpenAI;
 
-  // Replace API key check
-  content = content.replace(
-    /if\s+\(!process\.env\.OPENAI_API_KEY\)\s*{\s*throw\s+new\s+Error\([^)]+\);\s*}/,
-    `if (!${config.envVar}) {\n    throw new Error("I need an ${config.envKey} in your .env file to power my intelligence.");\n  }`,
-  );
+    // Replace the import statement
+    content = content.replace(
+      /import\s+{\s*Chat\w+\s*}\s+from\s+["']@langchain\/\w+["'];/,
+      config.import,
+    );
 
-  // Replace LLM instantiation
-  content = content.replace(
-    /const\s+llm\s*=\s*new\s+Chat\w+\s*\(\s*{\s*model\s*:\s*["'][^"']+["']\s*}\s*\);/,
-    config.constructor,
-  );
+    // Replace API key check
+    content = content.replace(
+      /if\s+\(!process\.env\.OPENAI_API_KEY\)\s*{\s*throw\s+new\s+Error\([^)]+\);\s*}/,
+      `if (!${config.envVar}) {\n    throw new Error("I need an ${config.envKey} in your .env file to power my intelligence.");\n  }`,
+    );
+
+    // Replace LLM instantiation
+    content = content.replace(
+      /const\s+llm\s*=\s*new\s+Chat\w+\s*\(\s*{\s*model\s*:\s*["'][^"']+["']\s*}\s*\);/,
+      config.constructor,
+    );
+  } else if (isVercelAI) {
+    // Vercel AI SDK model configuration
+    const vercelConfig = {
+      OpenAI: {
+        import: 'import { openai } from "@ai-sdk/openai";',
+        constructor: 'const model = openai("gpt-4o-mini");',
+        envKey: "OPENAI_API_KEY",
+        envVar: "process.env.OPENAI_API_KEY",
+      },
+      Gemini: {
+        import: 'import { google } from "@ai-sdk/google";',
+        constructor: 'const model = google("gemini-pro");',
+        envKey: "GOOGLE_GENERATIVE_AI_API_KEY",
+        envVar: "process.env.GOOGLE_GENERATIVE_AI_API_KEY",
+      },
+      Anthropic: {
+        import: 'import { anthropic } from "@ai-sdk/anthropic";',
+        constructor: 'const model = anthropic("claude-3-5-sonnet-20241022");',
+        envKey: "ANTHROPIC_API_KEY",
+        envVar: "process.env.ANTHROPIC_API_KEY",
+      },
+    };
+
+    const config = vercelConfig[modelProvider as keyof typeof vercelConfig] || vercelConfig.OpenAI;
+
+    // Replace the import statement
+    content = content.replace(
+      /import\s+{\s*\w+\s*}\s+from\s+["']@ai-sdk\/\w+["'];/,
+      config.import,
+    );
+
+    // Replace API key check
+    content = content.replace(
+      /if\s+\(!process\.env\.OPENAI_API_KEY\)\s*{\s*throw\s+new\s+Error\([^)]+\);\s*}/,
+      `if (!${config.envVar}) {\n    throw new Error("I need an ${config.envKey} in your .env file to power my intelligence.");\n  }`,
+    );
+
+    // Replace model instantiation
+    content = content.replace(
+      /const\s+model\s*=\s*\w+\s*\(\s*["'][^"']+["']\s*\);/,
+      config.constructor,
+    );
+  }
 
   await fs.writeFile(filePath, content);
 }
@@ -380,6 +472,9 @@ export async function handleNextSelection(
 
   // Update create-agent.ts to use the selected model provider
   await updateCreateAgentWithModelProvider(path.join(agentDir, "create-agent.ts"), modelProvider);
+
+  // Update package.json to include the required dependencies for the selected provider
+  await updatePackageJsonWithModelProvider(path.join(root, "package.json"), modelProvider);
 
   // Delete boilerplate routes
   await fs.rm(path.join(agentDir, "agentkit"), { recursive: true, force: true });
