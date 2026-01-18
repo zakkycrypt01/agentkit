@@ -218,7 +218,7 @@ function getModelProviderEnvConfig(modelProvider: string = "OpenAI"): string[] {
     case "Gemini":
       lines.push("# Google Gemini Configuration");
       lines.push("# Get keys from Google AI Studio: https://aistudio.google.com/app/apikey");
-      lines.push("GEMINI_API_KEY=");
+      lines.push("GOOGLE_API_KEY=");
       lines.push(`GEMINI_MODEL=${DefaultModels.Gemini}`);
       break;
     case "Anthropic":
@@ -311,9 +311,9 @@ async function updateCreateAgentWithModelProvider(
       },
       Gemini: {
         import: 'import { ChatGoogleGenerativeAI } from "@langchain/google-genai";',
-        constructor: 'const llm = new ChatGoogleGenerativeAI({ model: "gemini-pro" });',
-        envKey: "GEMINI_API_KEY",
-        envVar: "process.env.GEMINI_API_KEY",
+        constructor: 'const llm = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash-lite" });',
+        envKey: "GOOGLE_API_KEY",
+        envVar: "process.env.GOOGLE_API_KEY",
       },
       Anthropic: {
         import: 'import { ChatAnthropic } from "@langchain/anthropic";',
@@ -353,7 +353,7 @@ async function updateCreateAgentWithModelProvider(
       },
       Gemini: {
         import: 'import { google } from "@ai-sdk/google";',
-        constructor: 'const model = google("gemini-pro");',
+        constructor: 'const model = google("gemini-2.5-flash-lite");',
         envKey: "GOOGLE_GENERATIVE_AI_API_KEY",
         envVar: "process.env.GOOGLE_GENERATIVE_AI_API_KEY",
       },
