@@ -13,7 +13,7 @@ export function createVercelAIModel(
   provider: ModelProviderType,
   apiKey: string,
   model: string,
-) {
+): any {
   // Set the API key in environment if provided
   if (apiKey && !process.env.OPENAI_API_KEY && provider === "OpenAI") {
     process.env.OPENAI_API_KEY = apiKey;
