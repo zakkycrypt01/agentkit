@@ -239,6 +239,65 @@ function getModelProviderEnvConfig(modelProvider: string = "OpenAI"): string[] {
 }
 
 /**
+ * Updates the create-agent.ts file to use the selected AI model provider
+ * instead of being hardcoded to OpenAI.
+ *
+ * @param {string} filePath - The path to the create-agent.ts file
+ * @param {string} [modelProvider] - The selected AI model provider (OpenAI, Gemini, or Anthropic)
+ * @returns {Promise<void>}
+ */
+async function updateCreateAgentWithModelProvider(
+  filePath: string,
+  modelProvider: string = "OpenAI",
+): Promise<void> {
+  let content = await fs.readFile(filePath, "utf-8");
+
+  // Map model providers to their corresponding classes and env vars
+  const modelConfig = {
+    OpenAI: {
+      import: 'import { ChatOpenAI } from "@langchain/openai";',
+      constructor: 'const llm = new ChatOpenAI({ model: "gpt-4o-mini" });',
+      envKey: "OPENAI_API_KEY",
+      envVar: "process.env.OPENAI_API_KEY",
+    },
+    Gemini: {
+      import: 'import { ChatGoogleGenerativeAI } from "@langchain/google-genai";',
+      constructor: 'const llm = new ChatGoogleGenerativeAI({ model: "gemini-pro" });',
+      envKey: "GEMINI_API_KEY",
+      envVar: "process.env.GEMINI_API_KEY",
+    },
+    Anthropic: {
+      import: 'import { ChatAnthropic } from "@langchain/anthropic";',
+      constructor: 'const llm = new ChatAnthropic({ model: "claude-3-5-sonnet-20241022" });',
+      envKey: "ANTHROPIC_API_KEY",
+      envVar: "process.env.ANTHROPIC_API_KEY",
+    },
+  };
+
+  const config = modelConfig[modelProvider as keyof typeof modelConfig] || modelConfig.OpenAI;
+
+  // Replace the import statement
+  content = content.replace(
+    /import\s+{\s*Chat\w+\s*}\s+from\s+["']@langchain\/\w+["'];/,
+    config.import,
+  );
+
+  // Replace API key check
+  content = content.replace(
+    /if\s+\(!process\.env\.OPENAI_API_KEY\)\s*{\s*throw\s+new\s+Error\([^)]+\);\s*}/,
+    `if (!${config.envVar}) {\n    throw new Error("I need an ${config.envKey} in your .env file to power my intelligence.");\n  }`,
+  );
+
+  // Replace LLM instantiation
+  content = content.replace(
+    /const\s+llm\s*=\s*new\s+Chat\w+\s*\(\s*{\s*model\s*:\s*["'][^"']+["']\s*}\s*\);/,
+    config.constructor,
+  );
+
+  await fs.writeFile(filePath, content);
+}
+
+/**
  * Handles the selection of a network and wallet provider, updating the project configuration accordingly.
  *
  * This function:
@@ -318,6 +377,9 @@ export async function handleNextSelection(
   await promoteRoute(agentkitRouteConfig.prepareAgentkitRoute, "agentkit", "prepare-agentkit.ts");
   await promoteRoute(frameworkRouteConfig.createAgentRoute, "framework", "create-agent.ts");
   await promoteRoute(frameworkRouteConfig.apiRoute, "framework", "route.ts");
+
+  // Update create-agent.ts to use the selected model provider
+  await updateCreateAgentWithModelProvider(path.join(agentDir, "create-agent.ts"), modelProvider);
 
   // Delete boilerplate routes
   await fs.rm(path.join(agentDir, "agentkit"), { recursive: true, force: true });
