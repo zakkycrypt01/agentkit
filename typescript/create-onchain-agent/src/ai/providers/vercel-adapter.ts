@@ -14,23 +14,29 @@ export function createVercelAIModel(
   apiKey: string,
   model: string,
 ) {
+  // Set the API key in environment if provided
+  if (apiKey && !process.env.OPENAI_API_KEY && provider === "OpenAI") {
+    process.env.OPENAI_API_KEY = apiKey;
+  }
+  if (apiKey && !process.env.GOOGLE_GENERATIVE_AI_API_KEY && provider === "Gemini") {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+  }
+  if (apiKey && !process.env.ANTHROPIC_API_KEY && provider === "Anthropic") {
+    process.env.ANTHROPIC_API_KEY = apiKey;
+  }
+
   switch (provider) {
     case "OpenAI":
-      return openai(model, {
-        apiKey,
-      });
+      return openai(model as Parameters<typeof openai>[0]);
 
     case "Gemini":
-      return google(model, {
-        apiKey,
-      });
+      return google(model as Parameters<typeof google>[0]);
 
     case "Anthropic":
-      return anthropic(model, {
-        apiKey,
-      });
+      return anthropic(model as Parameters<typeof anthropic>[0]);
 
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
 }
+
