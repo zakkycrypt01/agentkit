@@ -1,6 +1,7 @@
-import { openai } from "@ai-sdk/openai";
 import { getVercelAITools } from "@coinbase/agentkit-vercel-ai-sdk";
 import { prepareAgentkitAndWalletProvider } from "./prepareAgentkit";
+import { createVercelAIModel } from "../../ai/providers/vercel-adapter.js";
+import { AI_PROVIDER, AI_API_KEY, getDefaultModel } from "../../ai/config.js";
 
 /**
  * Agent Configuration Guide
@@ -10,11 +11,12 @@ import { prepareAgentkitAndWalletProvider } from "./prepareAgentkit";
  * Key Steps to Customize Your Agent:
  *
  * 1. Select your LLM:
- *    - Modify the `openai` instantiation to choose your preferred LLM
+ *    - The LLM is now configured based on your selection in ai/config.ts
+ *    - Modify AI_PROVIDER and model settings in ai/config.ts
  *    - Configure model parameters like temperature and max tokens
  *
  * 2. Instantiate your Agent:
- *    - Pass the LLM, tools, and memory into `createReactAgent()`
+ *    - Pass the LLM, tools, and memory into the agent
  *    - Configure agent-specific parameters
  */
 
@@ -22,7 +24,7 @@ import { prepareAgentkitAndWalletProvider } from "./prepareAgentkit";
 type Agent = {
   tools: ReturnType<typeof getVercelAITools>;
   system: string;
-  model: ReturnType<typeof openai>;
+  model: ReturnType<typeof createVercelAIModel>;
   maxSteps?: number;
 };
 let agent: Agent;
@@ -32,7 +34,7 @@ let agent: Agent;
  * If an agent instance already exists, it returns the existing one.
  *
  * @function getOrInitializeAgent
- * @returns {Promise<ReturnType<typeof createReactAgent>>} The initialized AI agent.
+ * @returns {Promise<Agent>} The initialized AI agent.
  *
  * @description Handles agent setup
  *
@@ -45,8 +47,12 @@ export async function createAgent(): Promise<Agent> {
   }
 
   try {
-    // Initialize LLM: https://platform.openai.com/docs/models#gpt-4o
-    const model = openai("gpt-4o-mini");
+    // Initialize LLM using the configured provider
+    const model = createVercelAIModel(
+      AI_PROVIDER,
+      AI_API_KEY,
+      getDefaultModel(),
+    );
 
     const { agentkit, walletProvider } = await prepareAgentkitAndWalletProvider();
 
