@@ -297,6 +297,6 @@ export const ModelProviderDescriptions: Record<ModelProvider,string> = {
 }
 export const DefaultModels: Record<ModelProvider, string> = {
   OpenAI: "gpt-4",
-  Gemini: "gemini-pro",
+  Gemini: "gemini-2.5-flash-lite",
   Anthropic: "claude-3-5-sonnet-20241022",
 };
