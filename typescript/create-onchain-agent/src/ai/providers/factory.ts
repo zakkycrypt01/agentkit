@@ -1,7 +1,7 @@
 import { AIProvider } from "./base";
-import { OpenAIProvider } from "./openai";
-import { GeminiProvider } from "./gemini";
-import { AnthropicProvider } from "./anthropic";
+import { OpenAIProvider } from "./openai.js";
+import { GeminiProvider } from "./gemini.js";
+import { AnthropicProvider } from "./anthropic.js";
 
 export type ModelProviderType = "OpenAI" | "Gemini" | "Anthropic";
 
